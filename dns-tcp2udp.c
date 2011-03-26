@@ -233,59 +233,60 @@ int main(int argc, char *argv[]) {
 					FD_SET(in[i], &efds);
 				} else {
 					len[i] += ret;
+				}
 
-					if (len[i] >= SIZELEN) {
-						memcpy(&msgsz, buf[i], SIZELEN);
-						msgsz = ntohs(msgsz);
+				// size header in buffer?
+				if (!FD_ISSET(in[i], &efds) && len[i] >= SIZELEN) {
+					memcpy(&msgsz, buf[i], SIZELEN);
+					msgsz = ntohs(msgsz);
 
-						// complete message?
-						if (msgsz == 0) {
-							// zero length message: add socket to error set
-							FD_SET(in[i], &efds);
-						} else if (len[i] >= SIZELEN + msgsz) {
-							// open forwarding socket if it does not exist
-							if (out[i] == -1) {
-								ret = socket(dest->ai_family, dest->ai_socktype, dest->ai_protocol);
-								if (ret < 0) {
-									// failed open: add socket to error set
-									FD_SET(in[i], &efds);
+					// complete message?
+					if (msgsz == 0) {
+						// zero length message: add socket to error set
+						FD_SET(in[i], &efds);
+					} else if (len[i] >= SIZELEN + msgsz) {
+						// open forwarding socket if it does not exist
+						if (out[i] == -1) {
+							ret = socket(dest->ai_family, dest->ai_socktype, dest->ai_protocol);
+							if (ret < 0) {
+								// failed open: add socket to error set
+								FD_SET(in[i], &efds);
+							} else {
+								int flags;
+
+								out[i] = ret;
+
+								flags = fcntl(out[i], F_GETFL);
+								flags |= O_NONBLOCK;
+								ret = fcntl(out[i], F_SETFL, flags);
+								if (ret != 0) {
+									// failed fcntl: add socket to error set
+									FD_SET(out[i], &efds);
 								} else {
-									int flags;
-
-									out[i] = ret;
-
-									flags = fcntl(out[i], F_GETFL);
-									flags |= O_NONBLOCK;
-									ret = fcntl(out[i], F_SETFL, flags);
+									ret = connect(out[i], dest->ai_addr, dest->ai_addrlen);
 									if (ret != 0) {
-										// failed fcntl: add socket to error set
+										// failed connect: add socket to error set
 										FD_SET(out[i], &efds);
-									} else {
-										ret = connect(out[i], dest->ai_addr, dest->ai_addrlen);
-										if (ret != 0) {
-											// failed connect: add socket to error set
-											FD_SET(out[i], &efds);
-										}
 									}
 								}
 							}
+						}
 
-							// check forwarding socket is ok
-							if (out[i] != -1 && !FD_ISSET(out[i], &efds)) {
-								// write data
-								ret = send(out[i], &buf[i][SIZELEN], msgsz, 0);
-								if (ret < 0) {
-									// failed write: add socket to error set
-									FD_SET(out[i], &efds);
-								}
+						// check forwarding socket is ok
+						if (out[i] != -1 && !FD_ISSET(out[i], &efds)) {
+							// write data
+							ret = send(out[i], &buf[i][SIZELEN], msgsz, 0);
+							if (ret < 0) {
+								// failed write: add socket to error set
+								FD_SET(out[i], &efds);
 							}
+						}
 
-							// move remaining buffer data
-							len[i] -= SIZELEN;
-							len[i] -= msgsz;
-							if (len[i] > 0) {
-								memmove(buf[i], &buf[i][SIZELEN + msgsz], len[i]);
-							}
+						// move remaining buffer data
+						len[i] -= SIZELEN;
+						len[i] -= msgsz;
+						if (len[i] > 0) {
+							memmove(buf[i], &buf[i][SIZELEN + msgsz], len[i]);
 						}
 					}
 				}

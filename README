@@ -1,0 +1,12 @@
+Usage: ./dns-tcp2udp <dest ip> <listen ip> [listen ip]...
+
+Accepts TCP connections and forwards them using UDP.
+
+Incoming connections have a read buffer large enough to process a single DNS
+packet but no write buffer. If the socket write buffer is full the connection
+is closed. If there has been no UDP reponse for 30 seconds the connection is
+closed. Each TCP socket connection creates a separate UDP socket connection
+so that replies (should) go to the correct client.
+
+A hard maximum of 300 connections is enforced. New connections will be ignored
+until existing connections are closed.

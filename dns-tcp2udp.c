@@ -330,6 +330,7 @@ static void forward_message(int id, fd_set *efds, uint16_t msgsz, struct addrinf
 		if (ret < 0) {
 			// failed write: add socket to error set
 			FD_SET(out[id], efds);
+			// continue so that this buffer data can't be retried
 		}
 	}
 

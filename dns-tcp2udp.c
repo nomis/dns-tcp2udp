@@ -239,7 +239,10 @@ int main(int argc, char *argv[]) {
 						msgsz = ntohs(msgsz);
 
 						// complete message?
-						if (len[i] >= SIZELEN + msgsz) {
+						if (msgsz == 0) {
+							// zero length message: add socket to error set
+							FD_SET(in[i], &efds);
+						} else if (len[i] >= SIZELEN + msgsz) {
 							// open forwarding socket if it does not exist
 							if (out[i] == -1) {
 								ret = socket(dest->ai_family, dest->ai_socktype, dest->ai_protocol);

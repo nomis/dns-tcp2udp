@@ -335,7 +335,7 @@ int main(int argc, char *argv[]) {
 		// too
 		for (i = 0; i < MAXCONN; i++) {
 			if (in[i] != -1) {
-				if (now - last[i] > CLEANUP_TIMEOUT) {
+				if (now - last[i] >= CLEANUP_TIMEOUT) {
 					// close both sockets
 					close(in[i]);
 					in[i] = -1;

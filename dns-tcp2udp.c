@@ -128,7 +128,12 @@ static void setup(struct addrinfo **dest, int sockets, int server[], char *argv[
 		}
 
 		flags = fcntl(server[i], F_GETFL);
+		if (flags == -1) {
+			fprintf(stderr, "%s: unable to get flags: %s\n", argv[i + 2], strerror(errno));
+			exit(EXIT_FAILURE);
+		}
 		flags |= O_NONBLOCK;
+
 		ret = fcntl(server[i], F_SETFL, flags);
 		if (ret != 0) {
 			fprintf(stderr, "%s: unable to set O_NONBLOCK: %s\n", argv[i + 2], strerror(errno));

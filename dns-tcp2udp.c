@@ -300,20 +300,21 @@ static void incoming_read(int id, fd_set *efds, struct addrinfo *dest) {
 	if (ret <= 0) {
 		// failed read: add socket to error set
 		FD_SET(in[id], efds);
-	} else {
-		len[id] += ret;
+		return;
 	}
 
+	len[id] += ret;
+
 	// size header in buffer?
-	if (!FD_ISSET(in[id], efds) && len[id] >= SIZELEN) {
+	if (len[id] >= SIZELEN) {
 		memcpy(&msgsz, buf[id], SIZELEN);
 		msgsz = ntohs(msgsz);
 
-		// complete message?
 		if (msgsz == 0) {
 			// zero length message: add socket to error set
 			FD_SET(in[id], efds);
 		} else if (len[id] >= SIZELEN + msgsz) {
+			// complete message
 			forward_message(id, efds, msgsz, dest);
 		}
 	}
@@ -335,9 +336,8 @@ static void forward_message(int id, fd_set *efds, uint16_t msgsz, struct addrinf
 	// move remaining buffer data
 	len[id] -= SIZELEN;
 	len[id] -= msgsz;
-	if (len[id] > 0) {
+	if (len[id] > 0)
 		memmove(buf[id], &buf[id][SIZELEN + msgsz], len[id]);
-	}
 }
 
 static bool forward_ready(int id, fd_set *efds, struct addrinfo *dest) {
@@ -382,21 +382,23 @@ static void forwarding_read(int id, fd_set *efds, time_t now) {
 	if (resp_len <= 0) {
 		// failed read: add socket to error set
 		FD_SET(out[id], efds);
-	} else {
-		// prepend length
-		msgsz = htons(resp_len);
-		memcpy(resp, &msgsz, SIZELEN);
-
-		// send data
-		ret = send(in[id], &resp, SIZELEN + resp_len, 0);
-		if (ret < SIZELEN + resp_len) {
-			// failed write: add socket to error set
-			FD_SET(in[id], efds);
-		} else {
-			// success: reset timeout
-			last[id] = now;
-		}
+		return;
 	}
+
+	// prepend length
+	msgsz = htons(resp_len);
+	memcpy(resp, &msgsz, SIZELEN);
+
+	// send data
+	ret = send(in[id], &resp, SIZELEN + resp_len, 0);
+	if (ret < SIZELEN + resp_len) {
+		// failed write: add socket to error set
+		FD_SET(in[id], efds);
+		return;
+	}
+
+	// reset timeout
+	last[id] = now;
 }
 
 static void cleanup_inactive(time_t now) {

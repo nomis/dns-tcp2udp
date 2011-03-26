@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +38,10 @@ static void drop_root(char *name);
 static void background(char *name);
 static void loop(int sockets, int server[], struct addrinfo *dest);
 static void accept_new(int sockets, int server[], fd_set *rfds, time_t now);
+static void save_conn(int fd, time_t now);
 static void incoming_read(int id, fd_set *efds, struct addrinfo *dest);
+static void forward_message(int id, fd_set *efds, uint16_t msgsz, struct addrinfo *dest);
+static bool forward_ready(int id, fd_set *efds, struct addrinfo *dest);
 static void forwarding_read(int id, fd_set *efds, time_t now);
 static void cleanup_inactive(time_t now);
 static void close_conn(int id);
@@ -266,20 +270,23 @@ static void accept_new(int sockets, int server[], fd_set *rfds, time_t now) {
 	for (i = 0; i < sockets; i++) {
 		if (FD_ISSET(server[i], rfds)) {
 			ret = accept4(server[i], NULL, NULL, SOCK_NONBLOCK);
-			if (ret >= 0) {
-				int j;
+			if (ret >= 0)
+				save_conn(ret, now);
+		}
+	}
+}
 
-				// find spare slot (there must be one, we don't wait if full up)
-				for (j = 0; j < MAXCONN; j++) {
-					if (in[j] == -1) {
-						in[j] = ret;
-						out[j] = -1;
-						last[j] = now;
-						used++;
-						break;
-					}
-				}
-			}
+static void save_conn(int fd, time_t now) {
+	int i;
+
+	// find spare slot (there must be one, we don't accept if full up)
+	for (i = 0; i < MAXCONN; i++) {
+		if (in[i] == -1) {
+			in[i] = fd;
+			out[i] = -1;
+			last[i] = now;
+			used++;
+			break;
 		}
 	}
 }
@@ -307,51 +314,64 @@ static void incoming_read(int id, fd_set *efds, struct addrinfo *dest) {
 			// zero length message: add socket to error set
 			FD_SET(in[id], efds);
 		} else if (len[id] >= SIZELEN + msgsz) {
-			// open forwarding socket if it does not exist
-			if (out[id] == -1) {
-				ret = socket(dest->ai_family, dest->ai_socktype, dest->ai_protocol);
-				if (ret < 0) {
-					// failed open: add socket to error set
-					FD_SET(in[id], efds);
-				} else {
-					int flags;
-
-					out[id] = ret;
-
-					flags = fcntl(out[id], F_GETFL);
-					flags |= O_NONBLOCK;
-					ret = fcntl(out[id], F_SETFL, flags);
-					if (ret != 0) {
-						// failed fcntl: add socket to error set
-						FD_SET(out[id], efds);
-					} else {
-						ret = connect(out[id], dest->ai_addr, dest->ai_addrlen);
-						if (ret != 0) {
-							// failed connect: add socket to error set
-							FD_SET(out[id], efds);
-						}
-					}
-				}
-			}
-
-			// check forwarding socket is ok
-			if (out[id] != -1 && !FD_ISSET(out[id], efds)) {
-				// write data
-				ret = send(out[id], &buf[id][SIZELEN], msgsz, 0);
-				if (ret < 0) {
-					// failed write: add socket to error set
-					FD_SET(out[id], efds);
-				}
-			}
-
-			// move remaining buffer data
-			len[id] -= SIZELEN;
-			len[id] -= msgsz;
-			if (len[id] > 0) {
-				memmove(buf[id], &buf[id][SIZELEN + msgsz], len[id]);
-			}
+			forward_message(id, efds, msgsz, dest);
 		}
 	}
+}
+
+static void forward_message(int id, fd_set *efds, uint16_t msgsz, struct addrinfo *dest) {
+	int ret;
+
+	// check forwarding socket is ok
+	if (forward_ready(id, efds, dest)) {
+		// write data
+		ret = send(out[id], &buf[id][SIZELEN], msgsz, 0);
+		if (ret < 0) {
+			// failed write: add socket to error set
+			FD_SET(out[id], efds);
+		}
+	}
+
+	// move remaining buffer data
+	len[id] -= SIZELEN;
+	len[id] -= msgsz;
+	if (len[id] > 0) {
+		memmove(buf[id], &buf[id][SIZELEN + msgsz], len[id]);
+	}
+}
+
+static bool forward_ready(int id, fd_set *efds, struct addrinfo *dest) {
+	int flags, ret;
+
+	// open forwarding socket if it does not exist
+	if (out[id] != -1)
+		return true;
+
+	ret = socket(dest->ai_family, dest->ai_socktype, dest->ai_protocol);
+	if (ret < 0)
+		goto failed;
+
+	out[id] = ret;
+
+	flags = fcntl(out[id], F_GETFL);
+	if (flags == -1)
+		goto failed;
+	flags |= O_NONBLOCK;
+
+	ret = fcntl(out[id], F_SETFL, flags);
+	if (ret != 0)
+		goto failed;
+
+	ret = connect(out[id], dest->ai_addr, dest->ai_addrlen);
+	if (ret != 0)
+		goto failed;
+
+	return true;
+
+failed:
+	// add socket to error set
+	FD_SET(out[id], efds);
+	return false;
 }
 
 static void forwarding_read(int id, fd_set *efds, time_t now) {

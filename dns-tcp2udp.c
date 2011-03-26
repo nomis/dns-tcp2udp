@@ -239,7 +239,7 @@ int main(int argc, char *argv[]) {
 
 						// complete message?
 						if (len[i] >= SIZELEN + msgsz) {
-							// open forwarding socket if required
+							// open forwarding socket if it does not exist
 							if (out[i] == -1) {
 								ret = socket(dest->ai_family, dest->ai_socktype, dest->ai_protocol);
 								if (ret < 0) {
@@ -268,6 +268,7 @@ int main(int argc, char *argv[]) {
 
 							// check forwarding socket is ok
 							if (out[i] != -1 && !FD_ISSET(out[i], &efds)) {
+								// write data
 								ret = send(out[i], &buf[i][SIZELEN], msgsz, 0);
 								if (ret < 0) {
 									// failed write: add socket to error set

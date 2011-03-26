@@ -315,12 +315,12 @@ int main(int argc, char *argv[]) {
 			// handle errors on either socket by closing both sockets
 			if (in[i] != -1) {
 				if (FD_ISSET(in[i], &efds) || (out[i] != -1 && FD_ISSET(out[i], &efds))) {
-					shutdown(in[i], SHUT_RDWR);
+					close(in[i]);
 					in[i] = -1;
 					used--;
 
 					if (out[i] != -1) {
-						shutdown(out[i], SHUT_RDWR);
+						close(out[i]);
 						out[i] = -1;
 					}
 				}
@@ -337,12 +337,12 @@ int main(int argc, char *argv[]) {
 			if (in[i] != -1) {
 				if (now - last[i] > CLEANUP_TIMEOUT) {
 					// close both sockets
-					shutdown(in[i], SHUT_RDWR);
+					close(in[i]);
 					in[i] = -1;
 					used--;
 
 					if (out[i] != -1) {
-						shutdown(out[i], SHUT_RDWR);
+						close(out[i]);
 						out[i] = -1;
 					}
 				} else if (now < last[i]) {

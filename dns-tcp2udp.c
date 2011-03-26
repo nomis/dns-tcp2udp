@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
 					// failed read: add socket to error set
 					FD_SET(out[i], &efds);
 				} else {
-					// prepend lengtj
+					// prepend length
 					msgsz = htons(resp_len);
 					memcpy(resp, &msgsz, SIZELEN);
 

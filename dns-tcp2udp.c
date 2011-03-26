@@ -29,6 +29,7 @@ static int len[MAXCONN];          // incoming buffer used
 static int used;                  // connections in use
 static time_t last[MAXCONN];      // last response to incoming socket
 static int out[MAXCONN];          // outgoing sockets (can only exist while an incoming socket does too)
+static char resp[BUFSZ];          // response buffer
 
 static inline int max(int a, int b) { return a > b ? a : b; }
 
@@ -289,7 +290,6 @@ int main(int argc, char *argv[]) {
 
 			// read from forwarding socket
 			if (out[i] != -1 && FD_ISSET(out[i], &rfds)) {
-				char resp[BUFSZ];
 				int resp_len;
 
 				resp_len = recv(out[i], &resp[SIZELEN], MAXLEN, 0);

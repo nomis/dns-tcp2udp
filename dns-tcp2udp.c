@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
 			exit(EXIT_FAILURE);
 		}
 
-      flags = fcntl(server[i], F_GETFL);
+		flags = fcntl(server[i], F_GETFL);
 		flags |= O_NONBLOCK;
 		ret = fcntl(server[i], F_SETFL, flags);
 		if (ret != 0) {
@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
 
 									out[i] = ret;
 
-		      					flags = fcntl(out[i], F_GETFL);
+									flags = fcntl(out[i], F_GETFL);
 									flags |= O_NONBLOCK;
 									ret = fcntl(out[i], F_SETFL, flags);
 									if (ret != 0) {

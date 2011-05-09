@@ -270,8 +270,15 @@ static void accept_new(int sockets, int server[], fd_set *rfds, time_t now) {
 	for (i = 0; i < sockets; i++) {
 		if (FD_ISSET(server[i], rfds)) {
 			ret = accept4(server[i], NULL, NULL, SOCK_NONBLOCK);
-			if (ret >= 0)
+			if (ret >= 0) {
+				int tmp = BUFSZ;
+
+				// set buffer sizes to one DNS packet
+				setsockopt(ret, SOL_SOCKET, SO_RCVBUF, (void*)&tmp, sizeof(tmp));
+				setsockopt(ret, SOL_SOCKET, SO_SNDBUF, (void*)&tmp, sizeof(tmp));
+
 				save_conn(ret, now);
+			}
 		}
 	}
 }

@@ -44,6 +44,7 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 			size_t len = getRequestMessageSize();
 
 			required += len;
+
 			if (available >= required) {
 				request.consume(LENSZ);
 				if (len > 0) {
@@ -53,13 +54,13 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 					} catch (const boost::system::system_error &se) {
 						stop();
 					}
-					return;
 				} else {
 					io.post([this, self]{ this->readIncoming(SUCCESS, 0); });
 				}
+				return;
 			}
 		} else {
-			required = READAHEADLEN;
+			required += READAHEADLEN;
 		}
 
 		incoming.async_receive(request.prepare(required - available), [this, self](const error_code &ec2, size_t count2){ this->readIncoming(ec2, count2); });

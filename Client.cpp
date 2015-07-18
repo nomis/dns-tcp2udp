@@ -51,7 +51,7 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 						activity();
 						outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
 					} catch (const boost::system::system_error &se) {
-						close();
+						stop();
 					}
 					return;
 				} else {
@@ -64,7 +64,7 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 
 		incoming.async_receive(request.prepare(required - available), [this, self](const error_code &ec2, size_t count2){ this->readIncoming(ec2, count2); });
 	} else if (ec != errc::operation_canceled) {
-		close();
+		stop();
 	}
 }
 
@@ -83,7 +83,7 @@ void Client::writeOutgoing(const error_code &ec, size_t count __attribute__((unu
 		mutable_buffers_1 bufMessage = buffer(buf + LENSZ, BUFSZ - LENSZ);
 		outgoing.async_receive(bufMessage, [this, self, bufHeader](const error_code &ec2, size_t count2){ this->readOutgoing(ec2, count2, bufHeader); });
 	} else if (ec != errc::operation_canceled) {
-		close();
+		stop();
 	}
 }
 
@@ -104,10 +104,10 @@ void Client::readOutgoing(const error_code &ec, size_t count, mutable_buffers_1 
 			activity();
 			incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t count2){ this->writeIncoming(ec2, count2); });
 		} catch (const boost::system::system_error &se) {
-			close();
+			stop();
 		}
 	} else if (ec != errc::operation_canceled) {
-		close();
+		stop();
 	}
 }
 
@@ -116,7 +116,7 @@ void Client::writeIncoming(const error_code &ec, size_t count __attribute__((unu
 		response.consume(response.size());
 		readIncoming(SUCCESS, 0);
 	} else if (ec != errc::operation_canceled) {
-		close();
+		stop();
 	}
 }
 
@@ -130,13 +130,13 @@ void Client::activity() {
 void Client::timeout(const error_code &ec)
 {
   if (!ec)
-	  close();
+	  stop();
 }
 
-void Client::close() {
+void Client::stop() {
 	error_code ec;
 
 	idle.cancel(ec);
-	incoming.cancel(ec);
-	outgoing.cancel(ec);
+	incoming.close(ec);
+	outgoing.close(ec);
 }

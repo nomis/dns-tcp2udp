@@ -54,7 +54,7 @@ private:
 	static void setResponseMessageSize(boost::asio::mutable_buffers_1 buf, uint16_t len);
 	void activity();
 	void timeout(const boost::system::error_code& ec);
-	void close();
+	void stop();
 
 	boost::asio::io_service &io;
 	boost::asio::ip::tcp::socket incoming;

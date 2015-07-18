@@ -1,3 +1,4 @@
+#include <iostream>
 #include <list>
 #include <string>
 #include <boost/asio.hpp>

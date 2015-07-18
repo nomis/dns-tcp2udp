@@ -48,6 +48,8 @@ void Client::readIncoming(const boost::system::error_code &ec, size_t count) {
 				}
 				return;
 			}
+		} else {
+			required = READAHEADLEN;
 		}
 		incoming.async_receive(request.prepare(required - available), boost::bind(&Client::readIncoming, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 	} else if (ec != boost::system::errc::operation_canceled) {

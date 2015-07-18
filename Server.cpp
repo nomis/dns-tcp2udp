@@ -44,8 +44,6 @@ void Server::newConnection(const error_code &ec) {
 		return;
 
 	if (!ec) {
-		socket.set_option(socket_base::receive_buffer_size(BUFSZ));
-		socket.set_option(socket_base::send_buffer_size(BUFSZ));
 		try {
 			auto client(make_shared<Client>(io, move(socket), dest));
 			client->start();

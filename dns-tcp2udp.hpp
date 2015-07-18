@@ -4,11 +4,6 @@
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
 
-static const size_t LENSZ = 2;
-static const size_t MAXLEN = (1 << 16) - 1;
-static const size_t BUFSZ = LENSZ + MAXLEN;
-static const size_t READAHEADLEN = 512;
-
 class Server;
 class Client;
 

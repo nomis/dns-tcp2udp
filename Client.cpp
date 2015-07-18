@@ -12,11 +12,17 @@ using namespace boost::asio;
 namespace errc = boost::system::errc;
 using boost::system::error_code;
 
+static const size_t LENSZ = 2;
+static const size_t MAXLEN = (1 << 16) - 1;
+static const size_t BUFSZ = LENSZ + MAXLEN;
+static const size_t READAHEADLEN = 512;
 static const std::chrono::seconds TIMEOUT(30);
 static const error_code SUCCESS = errc::make_error_code(errc::success);
 
 Client::Client(io_service &io_, ip::tcp::socket incoming_, const ip::udp::endpoint &outgoing_)
 		: io(io_), incoming(move(incoming_)), outgoing(io, ip::udp::endpoint()), idle(io), request(BUFSZ), response(BUFSZ) {
+	incoming.set_option(socket_base::receive_buffer_size(BUFSZ));
+	incoming.set_option(socket_base::send_buffer_size(BUFSZ));
 	outgoing.connect(outgoing_);
 }
 

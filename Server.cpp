@@ -49,10 +49,7 @@ void Server::newConnection(const error_code &ec) {
 		try {
 			auto client(make_shared<Client>(io, move(socket), dest));
 			client->start();
-		} catch (boost::system::system_error &se) {
-			error_code ec2;
-			socket.close(ec2);
-		}
+		} catch (boost::system::system_error &se) {}
 	}
 
 	start();

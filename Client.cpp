@@ -48,12 +48,8 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 			if (available >= required) {
 				request.consume(LENSZ);
 				if (len > 0) {
-					try {
-						activity();
-						outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
-					} catch (const boost::system::system_error &se) {
-						stop();
-					}
+					activity();
+					outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
 				} else {
 					io.post([this, self]{ this->readIncoming(SUCCESS, 0); });
 				}
@@ -100,13 +96,8 @@ void Client::readOutgoing(const error_code &ec, size_t count, mutable_buffers_1 
 
 		setResponseMessageSize(bufHeader, count);
 		response.commit(LENSZ + count);
-
-		try {
-			activity();
-			incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t count2){ this->writeIncoming(ec2, count2); });
-		} catch (const boost::system::system_error &se) {
-			stop();
-		}
+		activity();
+		incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t count2){ this->writeIncoming(ec2, count2); });
 	} else if (ec != errc::operation_canceled) {
 		stop();
 	}

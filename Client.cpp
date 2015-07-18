@@ -117,11 +117,5 @@ void Client::timeout(const boost::system::error_code &ec)
 }
 
 void Client::close() {
-	shared_ptr<Client> self = this->shared_from_this();
-	boost::system::error_code ec;
-
-	idle.cancel(ec);
-	incoming.close(ec);
-	outgoing.close(ec);
 	server->clientFinished(this);
 }

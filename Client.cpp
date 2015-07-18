@@ -46,10 +46,10 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 			required += len;
 			if (available >= required) {
 				request.consume(LENSZ);
-				if (request.size() > 0) {
+				if (len > 0) {
 					try {
 						activity();
-						outgoing.async_send(request.data(), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
+						outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
 					} catch (const boost::system::system_error &se) {
 						close();
 					}

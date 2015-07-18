@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <list>
 #include <string>
 #include <boost/asio.hpp>
@@ -53,10 +54,10 @@ public:
 private:
 	void readIncoming(const boost::system::error_code &ec, size_t count);
 	void writeOutgoing(const boost::system::error_code &ec, size_t count);
-	void readOutgoing(const boost::system::error_code &ec, size_t count);
+	void readOutgoing(const boost::system::error_code &ec, size_t count, boost::asio::mutable_buffers_1 bufHeader);
 	void writeIncoming(const boost::system::error_code &ec, size_t count);
-	size_t getRequestMessageSize();
-	void setResponseMessageSize(size_t len);
+	uint16_t getRequestMessageSize();
+	static void setResponseMessageSize(boost::asio::mutable_buffers_1 buf, uint16_t len);
 	void activity();
 	void timeout(const boost::system::error_code& ec);
 	void close();
@@ -67,6 +68,5 @@ private:
 	boost::asio::ip::udp::socket outgoing;
 	boost::asio::steady_timer idle;
 	boost::asio::streambuf request;
-	boost::asio::streambuf responseHeader;
-	boost::asio::streambuf responseMessage;
+	boost::asio::streambuf response;
 };

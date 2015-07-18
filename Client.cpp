@@ -15,7 +15,7 @@ static const std::chrono::seconds TIMEOUT(30);
 static const boost::system::error_code SUCCESS = boost::system::errc::make_error_code(boost::system::errc::success);
 
 Client::Client(Server *server_, io_service &io_, ip::tcp::socket incoming_, const ip::udp::endpoint &outgoing_)
-		: io(io_), incoming(move(incoming_)), outgoing(io, ip::udp::endpoint()), idle(io), request(BUFSZ), responseHeader(LENSZ), responseMessage(MAXLEN) {
+		: io(io_), incoming(move(incoming_)), outgoing(io, ip::udp::endpoint()), idle(io), request(BUFSZ), response(BUFSZ) {
 	server = server_;
 	outgoing.connect(outgoing_);
 	activity();
@@ -55,40 +55,37 @@ void Client::readIncoming(const boost::system::error_code &ec, size_t count) {
 	}
 }
 
-size_t Client::getRequestMessageSize() {
+uint16_t Client::getRequestMessageSize() {
 	const uint8_t *data = buffer_cast<const uint8_t*>(request.data());
-	uint16_t len = (data[0] << 8) | data[1];
-	return len;
+	return (data[0] << 8) | data[1];
 }
 
 void Client::writeOutgoing(const boost::system::error_code &ec, size_t count __attribute__((unused))) {
 	if (!ec) {
 		request.consume(getRequestMessageSize());
-		outgoing.async_receive(responseMessage.prepare(MAXLEN), boost::bind(&Client::readOutgoing, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+		uint8_t *buf = buffer_cast<uint8_t*>(response.prepare(BUFSZ));
+		mutable_buffers_1 bufHeader = buffer(buf, LENSZ);
+		mutable_buffers_1 bufMessage = buffer(buf + LENSZ, BUFSZ - LENSZ);
+		outgoing.async_receive(bufMessage, boost::bind(&Client::readOutgoing, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred, bufHeader));
 	} else if (ec != boost::system::errc::operation_canceled) {
 		close();
 	}
 }
 
-void Client::setResponseMessageSize(size_t len) {
-	uint8_t *data = buffer_cast<uint8_t*>(responseHeader.prepare(LENSZ));
+void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
+	uint8_t *data = buffer_cast<uint8_t*>(buf);
 	data[0] = (len >> 8) & 0xFF;
 	data[1] = len & 0xFF;
-	responseHeader.commit(LENSZ);
 }
 
-void Client::readOutgoing(const boost::system::error_code &ec, size_t count) {
+void Client::readOutgoing(const boost::system::error_code &ec, size_t count, mutable_buffers_1 bufHeader) {
 	if (!ec) {
-		size_t len;
-
-		responseMessage.commit(count);
-		len = responseMessage.size();
-		setResponseMessageSize(len);
+		setResponseMessageSize(bufHeader, count);
+		response.commit(LENSZ + count);
 
 		try {
-			array<const_buffer, 2> bufs = {{ responseHeader.data(), responseMessage.data() }};
 			activity();
-			incoming.async_send(bufs, boost::bind(&Client::writeIncoming, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+			incoming.async_send(response.data(), boost::bind(&Client::writeIncoming, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 		} catch (const boost::system::system_error &se) {
 			close();
 		}
@@ -99,8 +96,7 @@ void Client::readOutgoing(const boost::system::error_code &ec, size_t count) {
 
 void Client::writeIncoming(const boost::system::error_code &ec, size_t count __attribute__((unused))) {
 	if (!ec) {
-		responseHeader.consume(responseHeader.size());
-		responseMessage.consume(responseMessage.size());
+		response.consume(response.size());
 		readIncoming(SUCCESS, 0);
 	} else if (ec != boost::system::errc::operation_canceled) {
 		close();

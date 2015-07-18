@@ -1,13 +1,13 @@
 #include <iostream>
-#include <list>
 #include <string>
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/system/error_code.hpp>
 
 #include "dns-tcp2udp.hpp"
 
 using namespace std;
 using namespace boost::asio;
+using boost::system::error_code;
 
 Server::Server(io_service &io_, const string &source, ip::udp::endpoint dest_)
 		: io(io_), acceptor(io), socket(io) {
@@ -34,11 +34,12 @@ Server::Server(io_service &io_, const string &source, ip::udp::endpoint dest_)
 	}
 }
 
-void Server::acceptConnection() {
-	acceptor.async_accept(socket, boost::bind(&Server::newConnection, this, boost::asio::placeholders::error));
+void Server::start() {
+	auto self(shared_from_this());
+	acceptor.async_accept(socket, [this, self](const error_code &ec){ this->newConnection(ec); });
 }
 
-void Server::newConnection(const boost::system::error_code &ec) {
+void Server::newConnection(const error_code &ec) {
 	if (!acceptor.is_open())
 		return;
 
@@ -46,20 +47,13 @@ void Server::newConnection(const boost::system::error_code &ec) {
 		socket.set_option(socket_base::receive_buffer_size(BUFSZ));
 		socket.set_option(socket_base::send_buffer_size(BUFSZ));
 		try {
-			clients.push_back(make_shared<Client>(this, io, move(socket), dest));
+			auto client(make_shared<Client>(io, move(socket), dest));
+			client->start();
 		} catch (boost::system::system_error &se) {
-			boost::system::error_code ec2;
+			error_code ec2;
 			socket.close(ec2);
 		}
 	}
 
-	acceptConnection();
-}
-
-void Server::clientFinished(Client *client) {
-	io.post(boost::bind(&Server::removeClient, this, client));
-}
-
-void Server::removeClient(Client *client) {
-	clients.remove(client->shared_from_this());
+	start();
 }

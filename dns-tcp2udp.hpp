@@ -34,23 +34,21 @@ private:
 class Server: public std::enable_shared_from_this<Server> {
 public:
 	Server(boost::asio::io_service &io_, const std::string &source, boost::asio::ip::udp::endpoint dest_);
-	void acceptConnection();
-	void clientFinished(Client *client);
+	void start();
 
 private:
 	void newConnection(const boost::system::error_code &ec);
-	void removeClient(Client *client);
 
 	boost::asio::io_service &io;
 	boost::asio::ip::tcp::acceptor acceptor;
 	boost::asio::ip::tcp::socket socket;
 	boost::asio::ip::udp::endpoint dest;
-	std::list<std::shared_ptr<Client>> clients;
 };
 
 class Client: public std::enable_shared_from_this<Client> {
 public:
-	Client(Server *server, boost::asio::io_service &io_, boost::asio::ip::tcp::socket incoming_, const boost::asio::ip::udp::endpoint &outgoing_);
+	Client(boost::asio::io_service &io_, boost::asio::ip::tcp::socket incoming_, const boost::asio::ip::udp::endpoint &outgoing_);
+	void start();
 
 private:
 	void readIncoming(const boost::system::error_code &ec, size_t count);
@@ -63,7 +61,6 @@ private:
 	void timeout(const boost::system::error_code& ec);
 	void close();
 
-	Server *server;
 	boost::asio::io_service &io;
 	boost::asio::ip::tcp::socket incoming;
 	boost::asio::ip::udp::socket outgoing;

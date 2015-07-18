@@ -4,7 +4,7 @@
 #include <string>
 #include <boost/asio.hpp>
 #include <boost/asio/signal_set.hpp>
-#include <boost/bind.hpp>
+#include <boost/system/error_code.hpp>
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -13,13 +13,14 @@
 
 using namespace std;
 using namespace boost::asio;
+using boost::system::error_code;
 
-static const int UID = 65534;
-static const int GID = 65534;
+static const uid_t UID = 65534;
+static const gid_t GID = 65534;
 
 Proxy::Proxy(string name_, const list<string> &sources, const string &dest, bool background_)
 		: name(name_), signals(io, SIGINT, SIGTERM) {
-	signals.async_wait(boost::bind(&boost::asio::io_service::stop, &io));
+	signals.async_wait([&](const error_code &, int){ io.stop(); });
 
 	createServers(sources, resolveDest(dest));
 	dropRoot();
@@ -90,5 +91,5 @@ void Proxy::background() {
 
 void Proxy::acceptConnections() {
 	for (shared_ptr<Server> server : servers)
-		server->acceptConnection();
+		server->start();
 }

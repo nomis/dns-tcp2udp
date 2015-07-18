@@ -1,29 +1,33 @@
 #include <cstdint>
 #include <chrono>
-#include <list>
 #include <string>
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <boost/bind.hpp>
+#include <boost/system/error_code.hpp>
 
 #include "dns-tcp2udp.hpp"
 
 using namespace std;
 using namespace boost::asio;
+namespace errc = boost::system::errc;
+using boost::system::error_code;
 
 static const std::chrono::seconds TIMEOUT(30);
-static const boost::system::error_code SUCCESS = boost::system::errc::make_error_code(boost::system::errc::success);
+static const error_code SUCCESS = errc::make_error_code(errc::success);
 
-Client::Client(Server *server_, io_service &io_, ip::tcp::socket incoming_, const ip::udp::endpoint &outgoing_)
+Client::Client(io_service &io_, ip::tcp::socket incoming_, const ip::udp::endpoint &outgoing_)
 		: io(io_), incoming(move(incoming_)), outgoing(io, ip::udp::endpoint()), idle(io), request(BUFSZ), response(BUFSZ) {
-	server = server_;
 	outgoing.connect(outgoing_);
+}
+
+void Client::start() {
 	activity();
 	readIncoming(SUCCESS, 0);
 }
 
-void Client::readIncoming(const boost::system::error_code &ec, size_t count) {
+void Client::readIncoming(const error_code &ec, size_t count) {
 	if (!ec) {
+		auto self(shared_from_this());
 		size_t required = LENSZ;
 		size_t available;
 
@@ -39,7 +43,7 @@ void Client::readIncoming(const boost::system::error_code &ec, size_t count) {
 				if (request.size() > 0) {
 					try {
 						activity();
-						outgoing.async_send(request.data(), boost::bind(&Client::writeOutgoing, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+						outgoing.async_send(request.data(), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
 					} catch (const boost::system::system_error &se) {
 						close();
 					}
@@ -51,8 +55,9 @@ void Client::readIncoming(const boost::system::error_code &ec, size_t count) {
 		} else {
 			required = READAHEADLEN;
 		}
-		incoming.async_receive(request.prepare(required - available), boost::bind(&Client::readIncoming, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-	} else if (ec != boost::system::errc::operation_canceled) {
+
+		incoming.async_receive(request.prepare(required - available), [this, self](const error_code &ec2, size_t count2){ this->readIncoming(ec2, count2); });
+	} else if (ec != errc::operation_canceled) {
 		close();
 	}
 }
@@ -62,14 +67,16 @@ uint16_t Client::getRequestMessageSize() {
 	return (data[0] << 8) | data[1];
 }
 
-void Client::writeOutgoing(const boost::system::error_code &ec, size_t count __attribute__((unused))) {
+void Client::writeOutgoing(const error_code &ec, size_t count __attribute__((unused))) {
 	if (!ec) {
+		auto self(shared_from_this());
 		request.consume(getRequestMessageSize());
+
 		uint8_t *buf = buffer_cast<uint8_t*>(response.prepare(BUFSZ));
 		mutable_buffers_1 bufHeader = buffer(buf, LENSZ);
 		mutable_buffers_1 bufMessage = buffer(buf + LENSZ, BUFSZ - LENSZ);
-		outgoing.async_receive(bufMessage, boost::bind(&Client::readOutgoing, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred, bufHeader));
-	} else if (ec != boost::system::errc::operation_canceled) {
+		outgoing.async_receive(bufMessage, [this, self, bufHeader](const error_code &ec2, size_t count2){ this->readOutgoing(ec2, count2, bufHeader); });
+	} else if (ec != errc::operation_canceled) {
 		close();
 	}
 }
@@ -80,42 +87,50 @@ void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
 	data[1] = len & 0xFF;
 }
 
-void Client::readOutgoing(const boost::system::error_code &ec, size_t count, mutable_buffers_1 bufHeader) {
+void Client::readOutgoing(const error_code &ec, size_t count, mutable_buffers_1 bufHeader) {
 	if (!ec) {
+		auto self(shared_from_this());
+
 		setResponseMessageSize(bufHeader, count);
 		response.commit(LENSZ + count);
 
 		try {
 			activity();
-			incoming.async_send(response.data(), boost::bind(&Client::writeIncoming, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+			incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t count2){ this->writeIncoming(ec2, count2); });
 		} catch (const boost::system::system_error &se) {
 			close();
 		}
-	} else if (ec != boost::system::errc::operation_canceled) {
+	} else if (ec != errc::operation_canceled) {
 		close();
 	}
 }
 
-void Client::writeIncoming(const boost::system::error_code &ec, size_t count __attribute__((unused))) {
+void Client::writeIncoming(const error_code &ec, size_t count __attribute__((unused))) {
 	if (!ec) {
 		response.consume(response.size());
 		readIncoming(SUCCESS, 0);
-	} else if (ec != boost::system::errc::operation_canceled) {
+	} else if (ec != errc::operation_canceled) {
 		close();
 	}
 }
 
 void Client::activity() {
+	auto self(shared_from_this());
+
 	idle.expires_from_now(TIMEOUT);
-	idle.async_wait(boost::bind(&Client::timeout, this, boost::asio::placeholders::error));
+	idle.async_wait([this, self](const error_code &ec){ this->timeout(ec); });
 }
 
-void Client::timeout(const boost::system::error_code &ec)
+void Client::timeout(const error_code &ec)
 {
   if (!ec)
 	  close();
 }
 
 void Client::close() {
-	server->clientFinished(this);
+	error_code ec;
+
+	idle.cancel(ec);
+	incoming.cancel(ec);
+	outgoing.cancel(ec);
 }

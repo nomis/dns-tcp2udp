@@ -53,10 +53,10 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 					} catch (const boost::system::system_error &se) {
 						close();
 					}
+					return;
 				} else {
-					readIncoming(SUCCESS, 0);
+					io.post([this, self]{ this->readIncoming(SUCCESS, 0); });
 				}
-				return;
 			}
 		} else {
 			required = READAHEADLEN;

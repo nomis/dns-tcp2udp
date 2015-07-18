@@ -4,11 +4,9 @@ Accepts TCP connections from one or more <listen ip> and forwards them using
 UDP to <dest ip>.
 
 Incoming connections have the read/write buffers set to large enough to
-process a single DNS packet but no more. If the socket write buffer is
-full the connection is closed. If there has been no UDP reponse for 30
-seconds the connection is closed. Each TCP socket connection creates a
-separate UDP socket connection so that replies (should) go to the correct
+process a single DNS packet but no more. If there has been no UDP reponse
+for 30 seconds the connection is closed. Each TCP socket connection creates
+a separate UDP socket connection so that replies (should) go to the correct
 client.
 
-A hard maximum of 300 connections is enforced. New connections will be ignored
-until existing connections are closed. Changes to UID/GID 65534 before forking.
+Changes to UID/GID 65534 before forking.

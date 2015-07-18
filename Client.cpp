@@ -32,37 +32,39 @@ void Client::start() {
 }
 
 void Client::readIncoming(const error_code &ec, size_t count) {
-	if (!ec) {
-		auto self(shared_from_this());
-		size_t required = LENSZ;
-		size_t available;
+	if (ec) {
+		if (ec != errc::operation_canceled)
+			stop();
+		return;
+	}
 
-		request.commit(count);
-		available = request.size();
+	auto self(shared_from_this());
+	size_t required = LENSZ;
+	size_t available;
+
+	request.commit(count);
+	available = request.size();
+
+	if (available >= required) {
+		size_t len = getRequestMessageSize();
+
+		required += len;
 
 		if (available >= required) {
-			size_t len = getRequestMessageSize();
-
-			required += len;
-
-			if (available >= required) {
-				request.consume(LENSZ);
-				if (len > 0) {
-					activity();
-					outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
-				} else {
-					io.post([this, self]{ this->readIncoming(SUCCESS, 0); });
-				}
-				return;
+			request.consume(LENSZ);
+			if (len > 0) {
+				activity();
+				outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
+			} else {
+				io.post([this, self]{ this->readIncoming(SUCCESS, 0); });
 			}
-		} else {
-			required += READAHEADLEN;
+			return;
 		}
-
-		incoming.async_receive(request.prepare(required - available), [this, self](const error_code &ec2, size_t count2){ this->readIncoming(ec2, count2); });
-	} else if (ec != errc::operation_canceled) {
-		stop();
+	} else {
+		required += READAHEADLEN;
 	}
+
+	incoming.async_receive(request.prepare(required - available), [this, self](const error_code &ec2, size_t count2){ this->readIncoming(ec2, count2); });
 }
 
 uint16_t Client::getRequestMessageSize() {
@@ -71,17 +73,19 @@ uint16_t Client::getRequestMessageSize() {
 }
 
 void Client::writeOutgoing(const error_code &ec, size_t count __attribute__((unused))) {
-	if (!ec) {
-		auto self(shared_from_this());
-		request.consume(getRequestMessageSize());
-
-		uint8_t *buf = buffer_cast<uint8_t*>(response.prepare(BUFSZ));
-		mutable_buffers_1 bufHeader = buffer(buf, LENSZ);
-		mutable_buffers_1 bufMessage = buffer(buf + LENSZ, BUFSZ - LENSZ);
-		outgoing.async_receive(bufMessage, [this, self, bufHeader](const error_code &ec2, size_t count2){ this->readOutgoing(ec2, count2, bufHeader); });
-	} else if (ec != errc::operation_canceled) {
-		stop();
+	if (ec) {
+		if (ec != errc::operation_canceled)
+			stop();
+		return;
 	}
+
+	auto self(shared_from_this());
+	uint8_t *buf = buffer_cast<uint8_t*>(response.prepare(BUFSZ));
+	mutable_buffers_1 bufHeader = buffer(buf, LENSZ);
+	mutable_buffers_1 bufMessage = buffer(buf + LENSZ, BUFSZ - LENSZ);
+
+	request.consume(getRequestMessageSize());
+	outgoing.async_receive(bufMessage, [this, self, bufHeader](const error_code &ec2, size_t count2){ this->readOutgoing(ec2, count2, bufHeader); });
 }
 
 void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
@@ -91,25 +95,29 @@ void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
 }
 
 void Client::readOutgoing(const error_code &ec, size_t count, mutable_buffers_1 bufHeader) {
-	if (!ec) {
-		auto self(shared_from_this());
-
-		setResponseMessageSize(bufHeader, count);
-		response.commit(LENSZ + count);
-		activity();
-		incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t count2){ this->writeIncoming(ec2, count2); });
-	} else if (ec != errc::operation_canceled) {
-		stop();
+	if (ec) {
+		if (ec != errc::operation_canceled)
+			stop();
+		return;
 	}
+
+	auto self(shared_from_this());
+
+	setResponseMessageSize(bufHeader, count);
+	response.commit(LENSZ + count);
+	activity();
+	incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t count2){ this->writeIncoming(ec2, count2); });
 }
 
 void Client::writeIncoming(const error_code &ec, size_t count __attribute__((unused))) {
-	if (!ec) {
-		response.consume(response.size());
-		readIncoming(SUCCESS, 0);
-	} else if (ec != errc::operation_canceled) {
-		stop();
+	if (ec) {
+		if (ec != errc::operation_canceled)
+			stop();
+		return;
 	}
+
+	response.consume(response.size());
+	readIncoming(SUCCESS, 0);
 }
 
 void Client::activity() {

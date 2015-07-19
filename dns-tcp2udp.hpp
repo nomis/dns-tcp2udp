@@ -54,7 +54,7 @@ private:
 	void writeRequest(const std::error_code &ec);
 	void readResponse(const std::error_code &ec, size_t count, asio::mutable_buffers_1 bufHeader);
 	void writeResponse(const std::error_code &ec);
-	uint16_t getRequestMessageSize();
+	uint16_t getRequestMessageSize() const;
 	static void setResponseMessageSize(asio::mutable_buffers_1 buf, uint16_t len);
 	void activity();
 	void timeout(const std::error_code& ec);

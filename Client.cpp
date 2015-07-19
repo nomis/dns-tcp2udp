@@ -46,7 +46,7 @@ void Client::readRequest(const error_code &ec, size_t count) {
 	available = request.size();
 
 	if (available >= required) {
-		size_t len = getRequestMessageSize();
+		uint16_t len = getRequestMessageSize();
 
 		required += len;
 
@@ -67,11 +67,6 @@ void Client::readRequest(const error_code &ec, size_t count) {
 	incoming.async_receive(request.prepare(required - available), strand.wrap([this, self](const error_code &ec2, size_t count2){ this->readRequest(ec2, count2); }));
 }
 
-uint16_t Client::getRequestMessageSize() {
-	const uint8_t *data = buffer_cast<const uint8_t*>(request.data());
-	return (data[0] << 8) | data[1];
-}
-
 void Client::writeRequest(const error_code &ec) {
 	if (ec) {
 		if (ec != operation_aborted)
@@ -86,12 +81,6 @@ void Client::writeRequest(const error_code &ec) {
 
 	request.consume(getRequestMessageSize());
 	outgoing.async_receive(bufMessage, strand.wrap([this, self, bufHeader](const error_code &ec2, size_t count2){ this->readResponse(ec2, count2, bufHeader); }));
-}
-
-void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
-	uint8_t *data = buffer_cast<uint8_t*>(buf);
-	data[0] = (len >> 8) & 0xFF;
-	data[1] = len & 0xFF;
 }
 
 void Client::readResponse(const error_code &ec, size_t count, mutable_buffers_1 bufHeader) {
@@ -118,6 +107,17 @@ void Client::writeResponse(const error_code &ec) {
 
 	response.consume(response.size());
 	readRequest(SUCCESS, 0);
+}
+
+uint16_t Client::getRequestMessageSize() const {
+	const uint8_t *data = buffer_cast<const uint8_t*>(request.data());
+	return (data[0] << 8) | data[1];
+}
+
+void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
+	uint8_t *data = buffer_cast<uint8_t*>(buf);
+	data[0] = (len >> 8) & 0xFF;
+	data[1] = len & 0xFF;
 }
 
 void Client::activity() {

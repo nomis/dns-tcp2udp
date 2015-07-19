@@ -1,23 +1,22 @@
 #include <cstdint>
 #include <chrono>
 #include <string>
-#include <boost/asio.hpp>
-#include <boost/asio/steady_timer.hpp>
-#include <boost/system/error_code.hpp>
+#include <system_error>
+#include <asio.hpp>
+#include <asio/steady_timer.hpp>
 
 #include "dns-tcp2udp.hpp"
 
 using namespace std;
-using namespace boost::asio;
-namespace errc = boost::system::errc;
-using boost::system::error_code;
+using namespace asio;
+using asio::error::operation_aborted;
 
 static const size_t LENSZ = 2;
 static const size_t MAXLEN = (1 << 16) - 1;
 static const size_t BUFSZ = LENSZ + MAXLEN;
 static const size_t READAHEADLEN = 512;
 static const auto TIMEOUT = chrono::seconds(30);
-static const error_code SUCCESS = errc::make_error_code(errc::success);
+static const error_code SUCCESS;
 
 Client::Client(io_service &io_, ip::tcp::socket incoming_, const ip::udp::endpoint &outgoing_)
 		: io(io_), strand(io), incoming(move(incoming_)), outgoing(io, ip::udp::endpoint()), idle(io), request(BUFSZ), response(BUFSZ) {
@@ -33,7 +32,7 @@ void Client::start() {
 
 void Client::readRequest(const error_code &ec, size_t count) {
 	if (ec) {
-		if (ec != errc::operation_canceled)
+		if (ec != operation_aborted)
 			stop();
 		return;
 	}
@@ -74,7 +73,7 @@ uint16_t Client::getRequestMessageSize() {
 
 void Client::writeRequest(const error_code &ec) {
 	if (ec) {
-		if (ec != errc::operation_canceled)
+		if (ec != operation_aborted)
 			stop();
 		return;
 	}
@@ -96,7 +95,7 @@ void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
 
 void Client::readResponse(const error_code &ec, size_t count, mutable_buffers_1 bufHeader) {
 	if (ec) {
-		if (ec != errc::operation_canceled)
+		if (ec != operation_aborted)
 			stop();
 		return;
 	}
@@ -111,7 +110,7 @@ void Client::readResponse(const error_code &ec, size_t count, mutable_buffers_1 
 
 void Client::writeResponse(const error_code &ec) {
 	if (ec) {
-		if (ec != errc::operation_canceled)
+		if (ec != operation_aborted)
 			stop();
 		return;
 	}

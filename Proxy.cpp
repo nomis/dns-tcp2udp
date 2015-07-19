@@ -3,9 +3,8 @@
 #include <iostream>
 #include <list>
 #include <string>
-#include <boost/asio.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <boost/system/error_code.hpp>
+#include <system_error>
+#include <asio.hpp>
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -13,8 +12,7 @@
 #include "dns-tcp2udp.hpp"
 
 using namespace std;
-using namespace boost::asio;
-using boost::system::error_code;
+using namespace asio;
 
 static const uid_t UID = 65534;
 static const gid_t GID = 65534;
@@ -44,7 +42,7 @@ ip::udp::endpoint Proxy::resolveDest(const string &dest) {
 
 	try {
 		return *resolver.resolve(query);
-	} catch (boost::system::system_error &se) {
+	} catch (system_error &se) {
 		cerr << dest << ": " << se.what() << "\n";
 		exit(EXIT_FAILURE);
 	}

@@ -1,13 +1,12 @@
 #include <iostream>
 #include <string>
-#include <boost/asio.hpp>
-#include <boost/system/error_code.hpp>
+#include <system_error>
+#include <asio.hpp>
 
 #include "dns-tcp2udp.hpp"
 
 using namespace std;
-using namespace boost::asio;
-using boost::system::error_code;
+using namespace asio;
 
 Server::Server(io_service &io_, const string &source, ip::udp::endpoint dest_)
 		: io(io_), acceptor(io), socket(io) {
@@ -28,7 +27,7 @@ Server::Server(io_service &io_, const string &source, ip::udp::endpoint dest_)
 			acceptor.set_option(ip::v6_only(true));
 		acceptor.bind(endpoint);
 		acceptor.listen();
-	} catch (boost::system::system_error &se) {
+	} catch (system_error &se) {
 		cerr << source << ": " << se.what() << "\n";
 		exit(EXIT_FAILURE);
 	}
@@ -47,7 +46,7 @@ void Server::newConnection(const error_code &ec) {
 		try {
 			auto client(make_shared<Client>(io, move(socket), dest));
 			client->start();
-		} catch (boost::system::system_error &se) {}
+		} catch (system_error &se) {}
 	}
 
 	start();

@@ -2,8 +2,8 @@
 
 CC=clang
 CXX=clang++
-CXXFLAGS=-std=c++11 -Wall -Wextra -Wshadow -DBOOST_SYSTEM_NO_DEPRECATED -DBOOST_ASIO_HAS_STD_CHRONO -O2 -g -pipe
-LDLIBS=-lstdc++ -lboost_system -lpthread
+CXXFLAGS=-std=c++11 -Wall -Wextra -Wshadow -DASIO_STANDALONE -DASIO_HAS_CLANG_LIBCXX -O2 -g -pipe
+LDLIBS=-lstdc++ -lpthread
 
 all: dns-tcp2udp
 

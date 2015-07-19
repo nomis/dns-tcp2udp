@@ -1,5 +1,9 @@
+#ifndef DNS_TCP2UDP_HPP_
+#define DNS_TCP2UDP_HPP_
+
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 #include <system_error>
 #include <asio.hpp>
@@ -64,3 +68,5 @@ private:
 	asio::streambuf request;
 	asio::streambuf response;
 };
+
+#endif /* DNS_TCP2UDP_HPP_ */

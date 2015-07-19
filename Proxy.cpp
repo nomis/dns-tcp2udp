@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iostream>
 #include <list>
+#include <memory>
 #include <string>
 #include <system_error>
 #include <asio.hpp>

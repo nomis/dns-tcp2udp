@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <chrono>
+#include <memory>
 #include <string>
 #include <system_error>
 #include <asio.hpp>

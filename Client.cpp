@@ -20,7 +20,7 @@ static const std::chrono::seconds TIMEOUT(30);
 static const error_code SUCCESS = errc::make_error_code(errc::success);
 
 Client::Client(io_service &io_, ip::tcp::socket incoming_, const ip::udp::endpoint &outgoing_)
-		: io(io_), incoming(move(incoming_)), outgoing(io, ip::udp::endpoint()), idle(io), request(BUFSZ), response(BUFSZ) {
+		: io(io_), strand(io), incoming(move(incoming_)), outgoing(io, ip::udp::endpoint()), idle(io), request(BUFSZ), response(BUFSZ) {
 	incoming.set_option(socket_base::receive_buffer_size(BUFSZ));
 	incoming.set_option(socket_base::send_buffer_size(BUFSZ));
 	outgoing.connect(outgoing_);
@@ -54,7 +54,7 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 			request.consume(LENSZ);
 			if (len > 0) {
 				activity();
-				outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t){ this->writeOutgoing(ec2); });
+				outgoing.async_send(buffer(request.data(), len), strand.wrap([this, self](const error_code &ec2, size_t){ this->writeOutgoing(ec2); }));
 			} else {
 				io.post([this, self]{ this->readIncoming(SUCCESS, 0); });
 			}
@@ -64,7 +64,7 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 		required += READAHEADLEN;
 	}
 
-	incoming.async_receive(request.prepare(required - available), [this, self](const error_code &ec2, size_t count2){ this->readIncoming(ec2, count2); });
+	incoming.async_receive(request.prepare(required - available), strand.wrap([this, self](const error_code &ec2, size_t count2){ this->readIncoming(ec2, count2); }));
 }
 
 uint16_t Client::getRequestMessageSize() {
@@ -85,7 +85,7 @@ void Client::writeOutgoing(const error_code &ec) {
 	mutable_buffers_1 bufMessage = buffer(buf + LENSZ, BUFSZ - LENSZ);
 
 	request.consume(getRequestMessageSize());
-	outgoing.async_receive(bufMessage, [this, self, bufHeader](const error_code &ec2, size_t count2){ this->readOutgoing(ec2, count2, bufHeader); });
+	outgoing.async_receive(bufMessage, strand.wrap([this, self, bufHeader](const error_code &ec2, size_t count2){ this->readOutgoing(ec2, count2, bufHeader); }));
 }
 
 void Client::setResponseMessageSize(mutable_buffers_1 buf, uint16_t len) {
@@ -106,7 +106,7 @@ void Client::readOutgoing(const error_code &ec, size_t count, mutable_buffers_1 
 	setResponseMessageSize(bufHeader, count);
 	response.commit(LENSZ + count);
 	activity();
-	incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t){ this->writeIncoming(ec2); });
+	incoming.async_send(response.data(), strand.wrap([this, self](const error_code &ec2, size_t){ this->writeIncoming(ec2); }));
 }
 
 void Client::writeIncoming(const error_code &ec) {
@@ -124,7 +124,7 @@ void Client::activity() {
 	auto self(shared_from_this());
 
 	idle.expires_from_now(TIMEOUT);
-	idle.async_wait([this, self](const error_code &ec){ this->timeout(ec); });
+	idle.async_wait(strand.wrap([this, self](const error_code &ec){ this->timeout(ec); }));
 }
 
 void Client::timeout(const error_code &ec)

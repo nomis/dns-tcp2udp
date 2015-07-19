@@ -57,6 +57,7 @@ private:
 	void stop();
 
 	boost::asio::io_service &io;
+	boost::asio::strand strand;
 	boost::asio::ip::tcp::socket incoming;
 	boost::asio::ip::udp::socket outgoing;
 	boost::asio::steady_timer idle;

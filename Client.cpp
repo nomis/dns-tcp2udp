@@ -54,7 +54,7 @@ void Client::readIncoming(const error_code &ec, size_t count) {
 			request.consume(LENSZ);
 			if (len > 0) {
 				activity();
-				outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t count2){ this->writeOutgoing(ec2, count2); });
+				outgoing.async_send(buffer(request.data(), len), [this, self](const error_code &ec2, size_t){ this->writeOutgoing(ec2); });
 			} else {
 				io.post([this, self]{ this->readIncoming(SUCCESS, 0); });
 			}
@@ -72,7 +72,7 @@ uint16_t Client::getRequestMessageSize() {
 	return (data[0] << 8) | data[1];
 }
 
-void Client::writeOutgoing(const error_code &ec, size_t count __attribute__((unused))) {
+void Client::writeOutgoing(const error_code &ec) {
 	if (ec) {
 		if (ec != errc::operation_canceled)
 			stop();
@@ -106,10 +106,10 @@ void Client::readOutgoing(const error_code &ec, size_t count, mutable_buffers_1 
 	setResponseMessageSize(bufHeader, count);
 	response.commit(LENSZ + count);
 	activity();
-	incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t count2){ this->writeIncoming(ec2, count2); });
+	incoming.async_send(response.data(), [this, self](const error_code &ec2, size_t){ this->writeIncoming(ec2); });
 }
 
-void Client::writeIncoming(const error_code &ec, size_t count __attribute__((unused))) {
+void Client::writeIncoming(const error_code &ec) {
 	if (ec) {
 		if (ec != errc::operation_canceled)
 			stop();

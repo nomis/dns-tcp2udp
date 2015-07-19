@@ -47,9 +47,9 @@ public:
 
 private:
 	void readIncoming(const boost::system::error_code &ec, size_t count);
-	void writeOutgoing(const boost::system::error_code &ec, size_t count);
+	void writeOutgoing(const boost::system::error_code &ec);
 	void readOutgoing(const boost::system::error_code &ec, size_t count, boost::asio::mutable_buffers_1 bufHeader);
-	void writeIncoming(const boost::system::error_code &ec, size_t count);
+	void writeIncoming(const boost::system::error_code &ec);
 	uint16_t getRequestMessageSize();
 	static void setResponseMessageSize(boost::asio::mutable_buffers_1 buf, uint16_t len);
 	void activity();

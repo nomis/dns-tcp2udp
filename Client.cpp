@@ -16,7 +16,7 @@ static const size_t LENSZ = 2;
 static const size_t MAXLEN = (1 << 16) - 1;
 static const size_t BUFSZ = LENSZ + MAXLEN;
 static const size_t READAHEADLEN = 512;
-static const std::chrono::seconds TIMEOUT(30);
+static const auto TIMEOUT = chrono::seconds(30);
 static const error_code SUCCESS = errc::make_error_code(errc::success);
 
 Client::Client(io_service &io_, ip::tcp::socket incoming_, const ip::udp::endpoint &outgoing_)
